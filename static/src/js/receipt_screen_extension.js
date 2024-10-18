@@ -12,6 +12,7 @@ patch(ReceiptScreen.prototype, {
     setup() {
         super.setup();
         this.orm = useService("orm");
+        this.notification = useService("notification");
     },
 
     async printReceipt() {
@@ -21,16 +22,41 @@ patch(ReceiptScreen.prototype, {
         })
         let printerUrl = result[0].printer_url;
         let jsonForPrinter = this._prepareJsonForPrinter();
-        debugger;
         console.log(jsonForPrinter);
-        await fetch(printerUrl, {
-            headers: {
-                "Content-type": "application/json",
-            },
-            body: JSON.stringify(jsonForPrinter),
-            method: "POST",
-            mode: 'no-cors'
-        });
+        await this.sendToPrinter(printerUrl, jsonForPrinter);
+    },
+
+    async sendToPrinter(printerUrl, jsonForPrinter) {
+        try {
+            const response = await this.fetchWithTimeout(printerUrl, {
+                headers: {
+                    "Content-type": "application/json",
+                },
+                body: JSON.stringify(jsonForPrinter),
+                method: "POST",
+                mode: 'no-cors'
+            }, 5000);
+
+            console.log('Impresión enviada correctamente.');
+
+        } catch (error) {
+            console.error('Error al enviar a la impresora:', error.message);
+            this.notification.add(
+                'Error al enviar a la impresora. ' + error.message,
+                {type: 'danger'},
+            )
+        }
+    },
+
+    fetchWithTimeout(url, options = {}, timeout = 5000) {
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('La solicitud ha tardado demasiado y ha sido cancelada.')), timeout)
+        );
+
+        return Promise.race([
+            fetch(url, options),
+            timeoutPromise
+        ]);
     },
 
     _prepareJsonForPrinter() {
@@ -154,7 +180,7 @@ patch(ReceiptScreen.prototype, {
                         'type': 'text',
                         'text': this._formatCurrencyForPrinter(line.get_amount()),
                         'width': 6,
-                         'styles': {
+                        'styles': {
                             'align': 'right'
                         }
                     }
@@ -164,7 +190,7 @@ patch(ReceiptScreen.prototype, {
         return formattedPaymentLines;
     },
 
-    _formatCurrencyForPrinter(amount){
+    _formatCurrencyForPrinter(amount) {
         let amountWithCurrency = this.env.utils.formatCurrency(amount);
         return amountWithCurrency.replace(/\s+/g, "");
     }
