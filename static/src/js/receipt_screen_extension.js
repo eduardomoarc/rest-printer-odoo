@@ -23,7 +23,9 @@ patch(PosStore.prototype, {
         })
         let printerUrl = result[0].printer_url;
         console.log("to:", printerUrl);
-        let jsonForPrinter = this._prepareJsonForPrinter();
+        debugger;
+        let jsonForPrinter = await this.env.services.orm.call('pos.order', 'prepare_json_for_printer', [this.get_order().id])
+        console.log("jsonForPrinter");
         console.log(jsonForPrinter);
         await this.sendToPrinter(printerUrl, jsonForPrinter);
         return true;
@@ -37,7 +39,7 @@ patch(PosStore.prototype, {
                 headers: {
                     "Content-type": "application/json",
                 },
-                body: JSON.stringify(jsonForPrinter),
+                body: jsonForPrinter,
                 method: "POST",
                 mode: 'no-cors'
             }, 5000);
@@ -65,141 +67,7 @@ patch(PosStore.prototype, {
         ]);
     },
 
-    _prepareJsonForPrinter() {
-        const order = this.get_order();
-        const orderTotalAmount = order.get_total_with_tax();
-        const orderAmountStr = this._formatCurrencyForPrinter(orderTotalAmount);
-        const dateOrder = formatDateTime(DateTime.fromFormat(order.date_order, "yyyy-MM-dd HH:mm:ss"));
-        let formattedLines = this._prepareLinesJsonForPrinter();
-        let formattedPaymentLines = this._preparePaymentLinesJsonForPrinter();
 
-        return [
-            {
-                'type': 'text',
-                'text': this.get_order().company_id.name,
-                'styles': {
-                    'align': 'center', 'bold': true
-                }
-            },
-            {
-                'type': 'text',
-                'text': 'Empleado:' + this.get_order().user_id.name,
-            },
-            {
-                'type': 'text',
-                'text': this.get_order().name,
-            },
-            {
-                'type': 'text',
-                'text': '----------------------------'
-            },
-            ...formattedLines,
-            {
-                'type': 'text',
-                'text': '----------------------------'
-            },
-            {
-                'type': 'rows',
-                'columns': [
-                    {
-                        'type': 'text',
-                        'text': 'Total',
-                        'width': 6,
-                        'styles': {
-                            'bold': true
-                        }
-                    },
-                    {
-                        'type': 'text',
-                        'text': orderAmountStr,
-                        'width': 6,
-                        'styles': {
-                            'align': 'right', 'bold': true
-                        }
-                    }
-                ]
-            },
-            ...formattedPaymentLines,
-            {
-                'type': 'text',
-                'text': '----------------------------'
-            },
-            {
-                'type': 'text',
-                'text': dateOrder
-            }
-        ];
-    },
-
-    _prepareLinesJsonForPrinter() {
-        const orderLines = this.get_order().get_orderlines();
-        let formattedOrderLines = [];
-        orderLines.map(line => {
-            formattedOrderLines.push({
-                'type': 'rows',
-                'columns': [
-                    {
-                        'type': 'text',
-                        'text': line.product_id.display_name,
-                        'width': 6
-                    },
-                    {
-                        'type': 'text',
-                        'text': this._formatCurrencyForPrinter(line.get_price_with_tax()),
-                        'width': 6,
-                        'styles': {
-                            'align': 'right'
-                        }
-                    }
-                ]
-            });
-            formattedOrderLines.push({
-                'type': 'rows',
-                'columns': [
-                    {
-                        'type': 'text',
-                        'text': `${line.get_quantity()} x ${this._formatCurrencyForPrinter(line.get_all_prices(1).priceWithTax)}`,  // Cantidad x Precio unitario
-                        'width': 12  // Toda la fila
-                    }
-                ]
-            });
-            formattedOrderLines.push({
-                'type': 'text',
-                'text': ''
-            })
-        });
-        return formattedOrderLines;
-    },
-
-    _preparePaymentLinesJsonForPrinter() {
-        let formattedPaymentLines = [];
-        this.get_order().payment_ids.map(line => {
-            formattedPaymentLines.push({
-                'type': 'rows',
-                'columns': [
-                    {
-                        'type': 'text',
-                        'text': line.payment_method_id.name,
-                        'width': 6
-                    },
-                    {
-                        'type': 'text',
-                        'text': this._formatCurrencyForPrinter(line.get_amount()),
-                        'width': 6,
-                        'styles': {
-                            'align': 'right'
-                        }
-                    }
-                ]
-            });
-        });
-        return formattedPaymentLines;
-    },
-
-    _formatCurrencyForPrinter(amount) {
-        let amountWithCurrency = this.env.utils.formatCurrency(amount);
-        return amountWithCurrency.replace(/\s+/g, "");
-    }
 
 });
 

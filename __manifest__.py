@@ -9,6 +9,7 @@
     'depends': ['point_of_sale', 'pos_restaurant'],
     'data': [
         'views/res_users.xml',
+        'views/res_company.xml',
     ],
     'assets': {
         'point_of_sale._assets_pos': [
